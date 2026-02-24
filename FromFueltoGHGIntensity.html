@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FuelEU Well-to-Wake Flow</title>
+  <style>
+    :root{
+      --bg:#0b1020;
+      --card:#101a33;
+      --card2:#0f1730;
+      --text:#e9f0ff;
+      --muted:#b9c6ffcc;
+      --line:#2a3a6a;
+      --accent:#3FC2C2;      /* Atria turquoise */
+      --accent2:#63F8EF;     /* Atria neon */
+      --good:#86f7a7;
+      --warn:#ffce6a;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius: 18px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:var(--sans);
+      color:var(--text);
+      background:
+        radial-gradient(1100px 650px at 18% 8%, rgba(99,248,239,.12), transparent 60%),
+        radial-gradient(900px 600px at 85% 0%, rgba(63,194,194,.12), transparent 55%),
+        linear-gradient(180deg, #070b16, var(--bg));
+      padding:18px;
+    }
+    .wrap{max-width:1050px;margin:0 auto}
+    .header{
+      display:flex;gap:14px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;
+      padding:6px 6px 12px;
+    }
+    h1{
+      margin:0;
+      font-size: clamp(20px, 2.6vw, 30px);
+      line-height:1.15;
+      letter-spacing:.2px;
+    }
+    .sub{margin:8px 0 0;color:var(--muted);max-width:80ch;font-size:14px}
+    .card{
+      background: linear-gradient(180deg, rgba(16,26,51,.85), rgba(15,23,48,.85));
+      border: 1px solid rgba(42,58,106,.8);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .head{
+      padding:14px 14px 12px;
+      border-bottom:1px solid rgba(42,58,106,.65);
+      display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+    }
+    .head h2{margin:0;font-size:15px;letter-spacing:.2px}
+    .badge{
+      font-size:12px;
+      color:var(--muted);
+      border:1px solid rgba(42,58,106,.75);
+      padding:6px 10px;
+      border-radius:999px;
+      display:flex;gap:8px;align-items:center;
+      background: rgba(7,11,22,.25);
+      user-select:none;
+    }
+    .dot{width:8px;height:8px;border-radius:50%}
+    .dot.accent{background:var(--accent)}
+    .dot.good{background:var(--good)}
+    .dot.warn{background:var(--warn)}
+    .body{padding:14px}
+    .grid{
+      display:grid;
+      grid-template-columns:1fr;
+      gap:14px;
+    }
+    @media(min-width:900px){
+      .grid{grid-template-columns: 1.2fr .8fr;}
+    }
+
+    /* Flow */
+    .flow{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      padding:4px;
+    }
+    .step{
+      border:1px solid rgba(42,58,106,.75);
+      background: rgba(7,11,22,.18);
+      border-radius:16px;
+      overflow:hidden;
+      position:relative;
+      transition: transform .15s ease, background .15s ease, border-color .15s ease;
+    }
+    .step.active{
+      background: rgba(7,11,22,.30);
+      border-color: rgba(63,194,194,.55);
+      transform: translateY(-1px);
+    }
+    .stepHdr{
+      display:flex;
+      gap:12px;
+      align-items:flex-start;
+      justify-content:space-between;
+      padding:12px;
+      cursor:pointer;
+    }
+    .left{
+      display:flex;gap:10px;align-items:flex-start;
+      min-width:0;
+    }
+    .num{
+      width:28px;height:28px;border-radius:10px;
+      display:grid;place-items:center;
+      background: rgba(63,194,194,.12);
+      border:1px solid rgba(63,194,194,.35);
+      color: var(--accent2);
+      font-family:var(--mono);
+      font-size:12px;
+      flex:0 0 auto;
+    }
+    .ttl{
+      display:flex;flex-direction:column;gap:4px;
+      min-width:0;
+    }
+    .ttl strong{
+      font-size:13px;
+      letter-spacing:.2px;
+    }
+    .ttl span{
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.35;
+    }
+    .pill{
+      padding:6px 10px;border-radius:999px;
+      border:1px solid rgba(42,58,106,.75);
+      font-size:12px;
+      color:var(--muted);
+      background: rgba(16,26,51,.35);
+      font-family:var(--mono);
+      white-space:nowrap;
+    }
+    .stepBody{
+      border-top:1px solid rgba(42,58,106,.55);
+      padding:12px;
+      display:none;
+    }
+    .step.active .stepBody{display:block}
+
+    .arrow{
+      display:flex;align-items:center;justify-content:center;
+      color:rgba(185,198,255,.65);
+      font-size:18px;
+      user-select:none;
+      line-height:1;
+      margin:2px 0;
+    }
+
+    /* Mini diagram (TTW / WTT) */
+    .mini{
+      display:grid;
+      grid-template-columns:1fr;
+      gap:12px;
+    }
+    .box{
+      padding:12px;
+      border-radius:16px;
+      border:1px solid rgba(42,58,106,.75);
+      background: rgba(7,11,22,.22);
+    }
+    .box h3{margin:0 0 8px 0;font-size:13px;display:flex;align-items:center;gap:8px}
+    .tag{
+      font-family:var(--mono);
+      font-size:11px;
+      padding:3px 8px;
+      border-radius:999px;
+      border:1px solid rgba(42,58,106,.8);
+      color:var(--muted);
+      background: rgba(16,26,51,.5);
+    }
+    .kv{
+      display:grid;
+      grid-template-columns: 1fr auto;
+      gap:8px;
+      font-size:12px;
+      padding:8px 0;
+      border-top:1px solid rgba(42,58,106,.45);
+    }
+    .kv:first-of-type{border-top:none}
+    .kv .k{color:var(--muted)}
+    .kv .v{font-family:var(--mono)}
+    .note{
+      padding:12px;
+      border-radius:16px;
+      border:1px solid rgba(63,194,194,.35);
+      background: rgba(63,194,194,.10);
+      font-size:13px;
+      line-height:1.5;
+    }
+    .note strong{color:var(--accent2)}
+    button{
+      width:100%;
+      border:none;
+      border-radius:14px;
+      padding:11px 12px;
+      font-weight:700;
+      cursor:pointer;
+      background: linear-gradient(90deg, rgba(63,194,194,.95), rgba(99,248,239,.9));
+      color:#061018;
+      box-shadow: 0 10px 25px rgba(0,0,0,.3);
+      margin-top:10px;
+    }
+    button.secondary{
+      background: rgba(7,11,22,.35);
+      border:1px solid rgba(42,58,106,.9);
+      color:var(--text);
+      box-shadow:none;
+    }
+    .result{
+      display:flex;flex-direction:column;gap:10px;margin-top:10px;
+      padding:12px;border-radius:16px;
+      border:1px solid rgba(42,58,106,.75);
+      background: rgba(7,11,22,.22);
+    }
+    .big{
+      font-size:18px;font-weight:900;
+      display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
+    }
+    .big .unit{font-size:12px;color:var(--muted);font-family:var(--mono)}
+    .eq{
+      font-family:var(--mono);
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.5;
+      border:1px dashed rgba(42,58,106,.85);
+      border-radius:14px;
+      background: rgba(16,26,51,.35);
+      padding:10px 12px;
+      white-space:pre-wrap;
+    }
+    a{color:var(--accent2);text-decoration:none}
+    a:hover{text-decoration:underline}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <div>
+        <h1>FuelEU Well-to-Wake Flow (Visual)</h1>
+        <p class="sub">
+          FuelEU builds its final number in stages. Tap each step to see what it means, then jump to the final formula:
+          <strong>Total lifecycle emissions ÷ total energy used = GHG intensity (gCO₂eq/MJ)</strong>
+        </p>
+      </div>
+    </div>
+
+    <section class="card">
+      <div class="head">
+        <h2>Interactive Flow — from fuel record to GHG intensity</h2>
+        <div class="badge"><span class="dot accent"></span>Tap steps • <span class="dot warn"></span>Simple, no heavy math</div>
+      </div>
+
+      <div class="body">
+        <div class="grid">
+          <!-- LEFT: FLOW -->
+          <div>
+            <div class="flow" id="flow">
+              <div class="step active" data-step="1">
+                <div class="stepHdr" role="button" tabindex="0">
+                  <div class="left">
+                    <div class="num">1</div>
+                    <div class="ttl">
+                      <strong>Fuel used on board</strong>
+                      <span>What gets recorded: fuel type + quantity (and voyage leg).</span>
+                    </div>
+                  </div>
+                  <div class="pill">Input</div>
+                </div>
+                <div class="stepBody">
+                  This is the starting point. If fuel type/class or quantity is wrong, everything after this shifts.
+                </div>
+              </div>
+
+              <div class="arrow">↓</div>
+
+              <div class="step" data-step="2">
+                <div class="stepHdr" role="button" tabindex="0">
+                  <div class="left">
+                    <div class="num">2</div>
+                    <div class="ttl">
+                      <strong>Emissions at the funnel</strong>
+                      <span>Tank-to-Wake emissions: CO₂, CH₄, and N₂O from combustion onboard.</span>
+                    </div>
+                  </div>
+                  <div class="pill">Tank-to-Wake</div>
+                </div>
+                <div class="stepBody">
+                  This is “what happens on board.” FuelEU counts CO₂ and also includes CH₄ and N₂O.
+                </div>
+              </div>
+
+              <div class="arrow">↓</div>
+
+              <div class="step" data-step="3">
+                <div class="stepHdr" role="button" tabindex="0">
+                  <div class="left">
+                    <div class="num">3</div>
+                    <div class="ttl">
+                      <strong>Convert everything into CO₂-equivalent</strong>
+                      <span>CH₄ and N₂O are converted into a single comparable unit: CO₂eq.</span>
+                    </div>
+                  </div>
+                  <div class="pill">CO₂eq</div>
+                </div>
+                <div class="stepBody">
+                  Because CH₄ and N₂O have higher warming impact, they’re converted using GWP multipliers into CO₂eq.
+                </div>
+              </div>
+
+              <div class="arrow">↓</div>
+
+              <div class="step" data-step="4">
+                <div class="stepHdr" role="button" tabindex="0">
+                  <div class="left">
+                    <div class="num">4</div>
+                    <div class="ttl">
+                      <strong>Add fuel production emissions</strong>
+                      <span>Well-to-Tank: emissions from producing and delivering the fuel (before it reaches the ship).</span>
+                    </div>
+                  </div>
+                  <div class="pill">Well-to-Tank</div>
+                </div>
+                <div class="stepBody">
+                  This is “what happened before the fuel reached the ship.” FuelEU includes this in lifecycle emissions.
+                </div>
+              </div>
+
+              <div class="arrow">↓</div>
+
+              <div class="step" data-step="5">
+                <div class="stepHdr" role="button" tabindex="0">
+                  <div class="left">
+                    <div class="num">5</div>
+                    <div class="ttl">
+                      <strong>Convert fuel into energy (MJ)</strong>
+                      <span>FuelEU compares emissions per energy, not per tonne of fuel.</span>
+                    </div>
+                  </div>
+                  <div class="pill">Energy</div>
+                </div>
+                <div class="stepBody">
+                  This creates the denominator. Two fuels can have different energy even if tonnage looks similar.
+                </div>
+              </div>
+
+              <div class="arrow">↓</div>
+
+              <div class="step" data-step="6">
+                <div class="stepHdr" role="button" tabindex="0">
+                  <div class="left">
+                    <div class="num">6</div>
+                    <div class="ttl">
+                      <strong>Divide emissions by energy</strong>
+                      <span>Lifecycle emissions ÷ total energy used.</span>
+                    </div>
+                  </div>
+                  <div class="pill">Intensity</div>
+                </div>
+                <div class="stepBody">
+                  This produces one comparable metric across fuels and voyages: GHG intensity (gCO₂eq/MJ).
+                </div>
+              </div>
+
+              <div class="arrow">↓</div>
+
+              <div class="step" data-step="7">
+                <div class="stepHdr" role="button" tabindex="0">
+                  <div class="left">
+                    <div class="num">7</div>
+                    <div class="ttl">
+                      <strong>Final result: GHG intensity</strong>
+                      <span>The compliance number FuelEU compares to the target.</span>
+                    </div>
+                  </div>
+                  <div class="pill">Output</div>
+                </div>
+                <div class="stepBody">
+                  Final metric: <strong>Well-to-Wake GHG intensity</strong> — it includes both onboard and production emissions.
+                </div>
+              </div>
+            </div>
+
+            <button id="expandAll">Expand all steps</button>
+            <button id="collapseAll" class="secondary">Collapse all steps</button>
+          </div>
+
+          <!-- RIGHT: TTW vs WTT + final equation -->
+          <div class="mini">
+            <div class="box">
+              <h3>🔍 What “Well-to-Wake” means <span class="tag">two parts</span></h3>
+
+              <div class="kv">
+                <div class="k">Tank-to-Wake (TTW)</div>
+                <div class="v">Onboard</div>
+              </div>
+              <div class="kv">
+                <div class="k">Well-to-Tank (WTT)</div>
+                <div class="v">Before ship</div>
+              </div>
+              <div class="kv">
+                <div class="k">FuelEU uses</div>
+                <div class="v">TTW + WTT</div>
+              </div>
+
+              <div class="note" style="margin-top:10px">
+                FuelEU considers both:
+                <strong>Tank-to-Wake</strong> (what happens on board)
+                and <strong>Well-to-Tank</strong> (what happened before the fuel reached the ship).
+              </div>
+            </div>
+
+            <div class="result">
+              <div class="big">
+                Final formula:
+                <span class="unit">gCO₂eq/MJ</span>
+              </div>
+              <div class="eq" id="finalEq">
+Total lifecycle emissions ÷ total energy used
+= GHG intensity (gCO₂eq/MJ)
+
+Where:
+Lifecycle emissions = (Tank-to-Wake CO₂eq) + (Well-to-Tank CO₂eq)
+Energy used = total MJ
+              </div>
+            </div>
+
+            <div class="box">
+              <h3>📌 Why this visual matters <span class="tag">onboard</span></h3>
+              <div class="kv">
+                <div class="k">If fuel type/class is wrong</div>
+                <div class="v">factors change</div>
+              </div>
+              <div class="kv">
+                <div class="k">If quantity/ROB is wrong</div>
+                <div class="v">totals shift</div>
+              </div>
+              <div class="kv">
+                <div class="k">If voyage leg is wrong</div>
+                <div class="v">coverage changes</div>
+              </div>
+
+              <p class="sub" style="margin:10px 0 0">
+                Supporting reference:
+                <a href="https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32023R1805" target="_blank" rel="noopener">
+                  Regulation (EU) 2023/1805 (FuelEU Maritime)
+                </a>
+              </p>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const steps = Array.from(document.querySelectorAll(".step"));
+    const activate = (el) => {
+      steps.forEach(s => s.classList.remove("active"));
+      el.classList.add("active");
+    };
+
+    // Click / keyboard open
+    steps.forEach(step => {
+      const hdr = step.querySelector(".stepHdr");
+      hdr.addEventListener("click", () => {
+        // Toggle open for this step, but keep "active" highlight
+        const isActive = step.classList.contains("active");
+        if(isActive){
+          // If active, just toggle body visibility by toggling active state briefly
+          step.classList.remove("active");
+          // If you want it to remain active even when collapsed, comment the above line.
+        } else {
+          activate(step);
+        }
+      });
+
+      hdr.addEventListener("keydown", (e) => {
+        if(e.key === "Enter" || e.key === " "){
+          e.preventDefault();
+          hdr.click();
+        }
+      });
+    });
+
+    // Expand/collapse all
+    document.getElementById("expandAll").addEventListener("click", () => {
+      steps.forEach(s => s.classList.add("active"));
+    });
+    document.getElementById("collapseAll").addEventListener("click", () => {
+      steps.forEach(s => s.classList.remove("active"));
+      // Keep first step active for orientation
+      steps[0].classList.add("active");
+    });
+  </script>
+</body>
+</html>
